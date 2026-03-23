@@ -6,21 +6,20 @@
     <title>游泳比賽成績查詢系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
-
-    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 md:max-w-2xl">
-        <h1 class="text-2xl font-extrabold text-center text-blue-600 mb-6">🏊 游泳成績查詢</h1>
+<body class="bg-gray-900 min-h-screen p-4 md:p-8 font-sans text-gray-100">
+    <div class="max-w-md mx-auto bg-gray-800 rounded-xl shadow-lg overflow-hidden p-6 md:max-w-2xl border border-gray-700">
+        <h1 class="text-2xl font-extrabold text-center text-blue-400 mb-6">🏊 游泳成績查詢</h1>
 
         <form id="searchForm" class="space-y-4 mb-8">
             <div>
-                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">選手姓名</label>
+                <label for="name" class="block text-sm font-medium text-gray-300 mb-1">選手姓名</label>
                 <input type="text" id="name" required placeholder="例如：張懿婷" 
-                       class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                       class="w-full rounded-md border border-gray-600 bg-gray-700 text-white px-3 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
             </div>
             <div>
-                <label for="year" class="block text-sm font-medium text-gray-700 mb-1">賽事年份 (選填)</label>
-                <input type="number" id="year" placeholder="例如：2024" 
-                       class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                <label for="year" class="block text-sm font-medium text-gray-300 mb-1">賽事年份 (選填：僅過濾歷次紀錄，PB 不受限)</label>
+                <input type="number" id="year" placeholder="例如：2026" 
+                       class="w-full rounded-md border border-gray-600 bg-gray-700 text-white px-3 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
             </div>
             <button type="submit" 
                     class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200">
@@ -28,71 +27,165 @@
             </button>
         </form>
 
-        <div id="resultsContainer" class="space-y-4">
-            <p class="text-center text-gray-400 text-sm">請輸入姓名以查詢成績</p>
+        <div id="resultsContainer" class="space-y-6">
+            <p class="text-center text-gray-500 text-sm">請輸入姓名以查詢成績</p>
         </div>
     </div>
 
     <script>
+		 // 定義標準的個人賽事清單
+        const standardEvents = [
+            '50公尺自由式', '100公尺自由式', '200公尺自由式', '400公尺自由式',
+            '50公尺仰式', '100公尺仰式', '200公尺仰式',
+            '50公尺蛙式', '100公尺蛙式', '200公尺蛙式',
+            '50公尺蝶式', '100公尺蝶式', '200公尺蝶式',
+            '100公尺混合式', '200公尺混合式', '400公尺混合式'
+        ];
+
+        // 輔助函式：強固版字串清理 (強制轉為字串，避免數字型態導致當機)
+        function cleanResultText(text) {
+            if (text === null || text === undefined || text === '') return 'N/A';
+            // 加入 String() 強制轉型，保護 trim() 和 split()
+            return String(text).trim().split(' ')[0];
+        }
+
+        function timeToSeconds(timeStr) {
+            let cleanStr = cleanResultText(timeStr);
+            if (cleanStr === 'N/A' || cleanStr.includes('DQ')) return Infinity;
+
+            let parts = cleanStr.split(':');
+            if (parts.length === 2) {
+                return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
+            }
+            let val = parseFloat(cleanStr);
+            return isNaN(val) ? Infinity : val;
+        }
+
         document.getElementById('searchForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); // 防止表單送出時重新整理頁面
+            e.preventDefault();
 
             const name = document.getElementById('name').value;
-            const year = document.getElementById('year').value;
+            const yearInput = document.getElementById('year').value;
             const container = document.getElementById('resultsContainer');
 
-            // 顯示載入中提示
-            container.innerHTML = '<p class="text-center text-blue-500 font-semibold animate-pulse">資料查詢中...</p>';
+            container.innerHTML = '<p class="text-center text-blue-400 font-semibold animate-pulse">資料解析中...</p>';
 
             try {
-                // 組合要呼叫的 API 網址
-                let apiUrl = `/api/results?name=${encodeURIComponent(name)}`;
-                if (year) apiUrl += `&year=${year}`;
-
-                // 向我們的 FastAPI 後端拿資料
+                const apiUrl = `/api/results?name=${encodeURIComponent(name)}`;
                 const response = await fetch(apiUrl);
-                const data = await response.json();
 
-                // 清空容器
+                // 確保 API 回傳正確才解析
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const allData = await response.json();
+
                 container.innerHTML = '';
 
-                // 如果沒查到資料
-                if (data.length === 0) {
-                    container.innerHTML = '<p class="text-center text-gray-500">找不到符合的成績資料 😢</p>';
+                if (allData.length === 0) {
+                    container.innerHTML = '<p class="text-center text-gray-400">找不到符合的成績資料 😢</p>';
                     return;
                 }
 
-                // 將查到的每一筆資料做成一張卡片
-                data.forEach(item => {
-                    // 1. 新增這行：用 split 把 " Name:" 後面的東西通通切掉，只保留前面的真實成績
-                    let cleanResult = item.result_text.split(' Name:')[0].trim();
+                // --- 1. 計算 PB ---
+                const pbs = {};
+                allData.forEach(item => {
+                    const fullText = (item.group_display || "") + " " + (item.event_name || "");
+                    if (fullText.includes('接力')) return;
 
-                    const card = document.createElement('div');
-                    card.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition';
-                    
-                    let badgeClass = 'bg-blue-100 text-blue-800'; 
-                    if (item.event_display === '總成績') badgeClass = 'bg-green-100 text-green-800';
-                    if (item.event_display.includes('棒')) badgeClass = 'bg-yellow-100 text-yellow-800';
+                    let strokeName = null;
+                    for (let evt of standardEvents) {
+                        if (fullText.includes(evt)) {
+                            strokeName = evt;
+                            break;
+                        }
+                    }
 
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="px-2 py-1 text-xs font-bold rounded ${badgeClass}">
-                                ${item.event_display}
-                            </span>
-                            <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${item.activity_year}</span>
-                        </div>
-                        <h3 class="text-lg font-bold text-gray-900">${item.student_name}</h3>
-                        <p class="text-sm text-gray-600 mt-1">${item.activity_short_name || item.activity_name}</p>
-                        <p class="text-sm text-gray-500">${item.event_name}</p>
-                        <div class="mt-3 flex justify-end items-baseline">
-                            <span class="text-lg font-black text-blue-600 tracking-tight">${cleanResult}</span>
-                        </div>
-                    `;
-                    container.appendChild(card);
+                    if (!strokeName) return;
+
+                    let secs = timeToSeconds(item.result_text);
+                    if (secs !== Infinity) {
+                        if (!pbs[strokeName] || secs < timeToSeconds(pbs[strokeName].result_text)) {
+                            pbs[strokeName] = item;
+                        }
+                    }
                 });
+
+                const pbKeys = Object.keys(pbs).sort((a, b) => standardEvents.indexOf(a) - standardEvents.indexOf(b));
+
+                if (pbKeys.length > 0) {
+                    let pbHtml = `
+                        <div class="mb-8">
+                            <h2 class="text-lg font-bold text-yellow-500 border-b-2 border-yellow-600 pb-1 mb-4 flex items-center">
+                                🏆 全時期個人最佳成績 (PB)
+                            </h2>
+                            <div class="grid grid-cols-2 gap-3">
+                    `;
+                    pbKeys.forEach(stroke => {
+                        const bestItem = pbs[stroke];
+                        const displayTime = cleanResultText(bestItem.result_text);
+                        pbHtml += `
+                            <div class="bg-gray-800 border border-yellow-600/50 rounded-lg p-3 shadow-md relative overflow-hidden">
+                                <div class="absolute -right-3 -top-3 text-yellow-600/20 text-5xl">🏅</div>
+                                <h3 class="text-sm font-bold text-gray-200 relative z-10">${stroke}</h3>
+                                <div class="text-xl font-black text-blue-300 tracking-tight mt-1 relative z-10">${displayTime}</div>
+                                <div class="text-[10px] text-gray-400 mt-2 truncate relative z-10" title="${bestItem.activity_short_name || bestItem.activity_name}">
+                                    ${bestItem.activity_year || '年份未定'} ${bestItem.activity_short_name || bestItem.activity_name || ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    pbHtml += `</div></div>`;
+                    container.innerHTML += pbHtml;
+                }
+
+                // --- 2. 歷次賽事紀錄 ---
+                // 強固版年份過濾：確保 item.activity_year 存在且轉型成字串比對
+                const historyData = yearInput
+                    ? allData.filter(item => item.activity_year && String(item.activity_year) === yearInput)
+                    : allData;
+
+                if (historyData.length > 0) {
+                    let historyHtml = `
+                        <div>
+                            <h2 class="text-lg font-bold text-blue-400 border-b-2 border-blue-600 pb-1 mb-4 flex items-center">
+                                📅 賽事紀錄 ${yearInput ? `(${yearInput}年)` : '(全部年份)'}
+                            </h2>
+                            <div class="space-y-3">
+                    `;
+
+                    historyData.forEach(item => {
+                        let badgeClass = 'bg-blue-900 text-blue-300 border border-blue-700';
+                        if (item.event_display === '總成績') badgeClass = 'bg-green-900 text-green-300 border border-green-700';
+                        if (item.event_display && item.event_display.includes('棒')) badgeClass = 'bg-yellow-900 text-yellow-300 border border-yellow-700';
+
+                        const displayResult = cleanResultText(item.result_text);
+
+                        historyHtml += `
+                            <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 shadow-sm">
+                                <div class="flex justify-between items-start mb-1">
+                                    <span class="px-2 py-1 text-[10px] font-bold rounded ${badgeClass}">
+                                        ${item.event_display || '成績'}
+                                    </span>
+                                    <span class="text-[10px] text-gray-400 bg-gray-700 px-2 py-1 rounded-full">${item.activity_year || '?'}</span>
+                                </div>
+                                <h3 class="text-sm font-bold text-gray-200 mt-2 leading-tight">${item.group_display || item.event_name || '未命名賽事'}</h3>
+                                <p class="text-xs text-gray-400 mt-1">${item.activity_short_name || item.activity_name || ''}</p>
+                                <div class="mt-2 flex justify-end items-baseline">
+                                    <span class="text-xl font-black text-gray-100 tracking-tight">${displayResult}</span>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    historyHtml += `</div></div>`;
+                    container.innerHTML += historyHtml;
+                } else {
+                    container.innerHTML += `<p class="text-center text-gray-500 mt-8">此年份無參賽紀錄</p>`;
+                }
+
             } catch (error) {
+                // 為了方便除錯，我讓畫面把真正的錯誤印出來
                 console.error('查詢失敗:', error);
-                container.innerHTML = '<p class="text-center text-red-500">系統發生錯誤，請稍後再試。</p>';
+                container.innerHTML = `<p class="text-center text-red-500">系統發生錯誤：${error.message}</p>`;
             }
         });
     </script>
