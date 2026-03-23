@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 min-h-screen p-4 md:p-8 font-sans text-gray-100">
+
     <div class="max-w-md mx-auto bg-gray-800 rounded-xl shadow-lg overflow-hidden p-6 md:max-w-2xl border border-gray-700">
         <h1 class="text-2xl font-extrabold text-center text-blue-400 mb-6">🏊 游泳成績查詢</h1>
 
@@ -33,7 +34,7 @@
     </div>
 
     <script>
-		 // 定義標準的個人賽事清單
+        // 定義標準的個人賽事清單
         const standardEvents = [
             '50公尺自由式', '100公尺自由式', '200公尺自由式', '400公尺自由式',
             '50公尺仰式', '100公尺仰式', '200公尺仰式',
@@ -42,17 +43,15 @@
             '100公尺混合式', '200公尺混合式', '400公尺混合式'
         ];
 
-        // 輔助函式：強固版字串清理 (強制轉為字串，避免數字型態導致當機)
         function cleanResultText(text) {
             if (text === null || text === undefined || text === '') return 'N/A';
-            // 加入 String() 強制轉型，保護 trim() 和 split()
-            return String(text).trim().split(' ')[0];
+            return String(text).trim().split(' ')[0]; 
         }
 
         function timeToSeconds(timeStr) {
             let cleanStr = cleanResultText(timeStr);
             if (cleanStr === 'N/A' || cleanStr.includes('DQ')) return Infinity;
-
+            
             let parts = cleanStr.split(':');
             if (parts.length === 2) {
                 return parseInt(parts[0], 10) * 60 + parseFloat(parts[1]);
@@ -68,13 +67,11 @@
             const yearInput = document.getElementById('year').value;
             const container = document.getElementById('resultsContainer');
 
-            container.innerHTML = '<p class="text-center text-blue-400 font-semibold animate-pulse">資料解析中...</p>';
+            container.innerHTML = '<p class="text-center text-blue-400 font-semibold animate-pulse">資料解析與分段萃取中...</p>';
 
             try {
                 const apiUrl = `/api/results?name=${encodeURIComponent(name)}`;
                 const response = await fetch(apiUrl);
-
-                // 確保 API 回傳正確才解析
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const allData = await response.json();
 
@@ -85,33 +82,69 @@
                     return;
                 }
 
-                // --- 1. 計算 PB ---
+                // --- 1. 計算 PB (包含個人最佳與極限分段) ---
                 const pbs = {};
+                standardEvents.forEach(evt => {
+                    pbs[evt] = { indTime: Infinity, indItem: null, absTime: Infinity, absItem: null };
+                });
+
                 allData.forEach(item => {
                     const fullText = (item.group_display || "") + " " + (item.event_name || "");
-                    if (fullText.includes('接力')) return;
+                    if (item.event_display === '總成績') return; 
 
                     let strokeName = null;
-                    for (let evt of standardEvents) {
-                        if (fullText.includes(evt)) {
-                            strokeName = evt;
-                            break;
+                    let isSplit = item.event_display && item.event_display.includes('棒');
+                    let isInd = !fullText.includes('接力') && !isSplit;
+
+                    if (isInd) {
+                        for (let evt of standardEvents) {
+                            if (fullText.includes(evt)) {
+                                strokeName = evt;
+                                break;
+                            }
                         }
+                    } else if (isSplit) {
+                        let dist = null;
+                        let stroke = null;
+                        
+                        let distMatch = fullText.match(/4\s*[xX×*]\s*(50|100|200)/);
+                        if (distMatch) dist = distMatch[1] + "公尺";
+                        else if (fullText.includes('50公尺')) dist = "50公尺";
+                        else if (fullText.includes('100公尺')) dist = "100公尺";
+
+                        let strokeMatch = fullText.match(/\((仰式|蛙式|蝶式|自由式)\)/);
+                        if (strokeMatch) {
+                            stroke = strokeMatch[1];
+                        } else if (fullText.includes('混合式接力')) {
+                            if (item.event_display.includes('1棒')) stroke = "仰式";
+                            if (item.event_display.includes('2棒')) stroke = "蛙式";
+                            if (item.event_display.includes('3棒')) stroke = "蝶式";
+                            if (item.event_display.includes('4棒')) stroke = "自由式";
+                        } else if (fullText.includes('自由式接力')) {
+                            stroke = "自由式";
+                        }
+
+                        if (dist && stroke) strokeName = dist + stroke;
                     }
 
-                    if (!strokeName) return;
-
-                    let secs = timeToSeconds(item.result_text);
-                    if (secs !== Infinity) {
-                        if (!pbs[strokeName] || secs < timeToSeconds(pbs[strokeName].result_text)) {
-                            pbs[strokeName] = item;
+                    if (strokeName && pbs[strokeName]) {
+                        let secs = timeToSeconds(item.result_text);
+                        if (secs !== Infinity) {
+                            if (isInd && secs < pbs[strokeName].indTime) {
+                                pbs[strokeName].indTime = secs;
+                                pbs[strokeName].indItem = item;
+                            }
+                            if (secs < pbs[strokeName].absTime) {
+                                pbs[strokeName].absTime = secs;
+                                pbs[strokeName].absItem = item;
+                            }
                         }
                     }
                 });
 
-                const pbKeys = Object.keys(pbs).sort((a, b) => standardEvents.indexOf(a) - standardEvents.indexOf(b));
+                const validPbKeys = Object.keys(pbs).filter(k => pbs[k].absTime !== Infinity);
 
-                if (pbKeys.length > 0) {
+                if (validPbKeys.length > 0) {
                     let pbHtml = `
                         <div class="mb-8">
                             <h2 class="text-lg font-bold text-yellow-500 border-b-2 border-yellow-600 pb-1 mb-4 flex items-center">
@@ -119,16 +152,27 @@
                             </h2>
                             <div class="grid grid-cols-2 gap-3">
                     `;
-                    pbKeys.forEach(stroke => {
-                        const bestItem = pbs[stroke];
-                        const displayTime = cleanResultText(bestItem.result_text);
+                    
+                    validPbKeys.forEach(stroke => {
+                        const record = pbs[stroke];
+                        
+                        let indDisplay = record.indItem ? cleanResultText(record.indItem.result_text) : '無個人賽';
+                        let absHtml = '';
+                        if (record.absTime < record.indTime) {
+                            const fastSplit = cleanResultText(record.absItem.result_text);
+                            absHtml = `<span class="text-sm font-bold text-green-400 ml-1" title="接力分段最快紀錄">(${fastSplit})</span>`;
+                        }
+
+                        const bottomItem = record.indItem || record.absItem;
+
                         pbHtml += `
-                            <div class="bg-gray-800 border border-yellow-600/50 rounded-lg p-3 shadow-md relative overflow-hidden">
-                                <div class="absolute -right-3 -top-3 text-yellow-600/20 text-5xl">🏅</div>
-                                <h3 class="text-sm font-bold text-gray-200 relative z-10">${stroke}</h3>
-                                <div class="text-xl font-black text-blue-300 tracking-tight mt-1 relative z-10">${displayTime}</div>
-                                <div class="text-[10px] text-gray-400 mt-2 truncate relative z-10" title="${bestItem.activity_short_name || bestItem.activity_name}">
-                                    ${bestItem.activity_year || '年份未定'} ${bestItem.activity_short_name || bestItem.activity_name || ''}
+                            <div class="bg-gray-800 border border-gray-700 rounded-lg p-3 shadow-md">
+                                <h3 class="text-sm font-bold text-gray-200">${stroke}</h3>
+                                <div class="text-xl font-black text-blue-300 tracking-tight mt-1">
+                                    ${indDisplay} ${absHtml}
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-2 truncate" title="${bottomItem.activity_short_name || bottomItem.activity_name}">
+                                    ${bottomItem.activity_year || '?'} ${bottomItem.activity_short_name || bottomItem.activity_name || ''}
                                 </div>
                             </div>
                         `;
@@ -138,9 +182,8 @@
                 }
 
                 // --- 2. 歷次賽事紀錄 ---
-                // 強固版年份過濾：確保 item.activity_year 存在且轉型成字串比對
-                const historyData = yearInput
-                    ? allData.filter(item => item.activity_year && String(item.activity_year) === yearInput)
+                const historyData = yearInput 
+                    ? allData.filter(item => item.activity_year && String(item.activity_year) === yearInput) 
                     : allData;
 
                 if (historyData.length > 0) {
@@ -153,7 +196,7 @@
                     `;
 
                     historyData.forEach(item => {
-                        let badgeClass = 'bg-blue-900 text-blue-300 border border-blue-700';
+                        let badgeClass = 'bg-blue-900 text-blue-300 border border-blue-700'; 
                         if (item.event_display === '總成績') badgeClass = 'bg-green-900 text-green-300 border border-green-700';
                         if (item.event_display && item.event_display.includes('棒')) badgeClass = 'bg-yellow-900 text-yellow-300 border border-yellow-700';
 
@@ -183,7 +226,6 @@
                 }
 
             } catch (error) {
-                // 為了方便除錯，我讓畫面把真正的錯誤印出來
                 console.error('查詢失敗:', error);
                 container.innerHTML = `<p class="text-center text-red-500">系統發生錯誤：${error.message}</p>`;
             }
