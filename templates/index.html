@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>游泳比賽成績查詢系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8 font-sans">
+
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6 md:max-w-2xl">
+        <h1 class="text-2xl font-extrabold text-center text-blue-600 mb-6">🏊 游泳成績查詢</h1>
+
+        <form id="searchForm" class="space-y-4 mb-8">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-1">選手姓名</label>
+                <input type="text" id="name" required placeholder="例如：張懿婷" 
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            </div>
+            <div>
+                <label for="year" class="block text-sm font-medium text-gray-700 mb-1">賽事年份 (選填)</label>
+                <input type="number" id="year" placeholder="例如：2024" 
+                       class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+            </div>
+            <button type="submit" 
+                    class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200">
+                開始查詢
+            </button>
+        </form>
+
+        <div id="resultsContainer" class="space-y-4">
+            <p class="text-center text-gray-400 text-sm">請輸入姓名以查詢成績</p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('searchForm').addEventListener('submit', async function(e) {
+            e.preventDefault(); // 防止表單送出時重新整理頁面
+
+            const name = document.getElementById('name').value;
+            const year = document.getElementById('year').value;
+            const container = document.getElementById('resultsContainer');
+
+            // 顯示載入中提示
+            container.innerHTML = '<p class="text-center text-blue-500 font-semibold animate-pulse">資料查詢中...</p>';
+
+            try {
+                // 組合要呼叫的 API 網址
+                let apiUrl = `/api/results?name=${encodeURIComponent(name)}`;
+                if (year) apiUrl += `&year=${year}`;
+
+                // 向我們的 FastAPI 後端拿資料
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                // 清空容器
+                container.innerHTML = '';
+
+                // 如果沒查到資料
+                if (data.length === 0) {
+                    container.innerHTML = '<p class="text-center text-gray-500">找不到符合的成績資料 😢</p>';
+                    return;
+                }
+
+                // 將查到的每一筆資料做成一張卡片
+                data.forEach(item => {
+                    // 1. 新增這行：用 split 把 " Name:" 後面的東西通通切掉，只保留前面的真實成績
+                    let cleanResult = item.result_text.split(' Name:')[0].trim();
+
+                    const card = document.createElement('div');
+                    card.className = 'bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition';
+                    
+                    let badgeClass = 'bg-blue-100 text-blue-800'; 
+                    if (item.event_display === '總成績') badgeClass = 'bg-green-100 text-green-800';
+                    if (item.event_display.includes('棒')) badgeClass = 'bg-yellow-100 text-yellow-800';
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <span class="px-2 py-1 text-xs font-bold rounded ${badgeClass}">
+                                ${item.event_display}
+                            </span>
+                            <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${item.activity_year}</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900">${item.student_name}</h3>
+                        <p class="text-sm text-gray-600 mt-1">${item.activity_short_name || item.activity_name}</p>
+                        <p class="text-sm text-gray-500">${item.event_name}</p>
+                        <div class="mt-3 flex justify-end items-baseline">
+                            <span class="text-lg font-black text-blue-600 tracking-tight">${cleanResult}</span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                console.error('查詢失敗:', error);
+                container.innerHTML = '<p class="text-center text-red-500">系統發生錯誤，請稍後再試。</p>';
+            }
+        });
+    </script>
+</body>
+</html>
