@@ -24,6 +24,30 @@ async def read_index(request: Request):
     #return templates.TemplateResponse("index.html", {"request": request})
     return templates.TemplateResponse(request=request, name="index.html")
 
+# 2.1 請將這段加在 main.py 裡面，原本的 @app.get("/api/results") 之前或之後都可以
+@app.get("/api/athletes")
+async def get_athletes():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 只要撈取「個人成績」的選手姓名，並過濾掉重複的名字，按筆畫或拼音排序
+    query = """
+        SELECT DISTINCT student_name
+        FROM results
+        WHERE event_display = '個人成績'
+          AND student_name IS NOT NULL
+          AND student_name != ''
+        ORDER BY student_name ASC
+    """
+
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    conn.close()
+
+    # 將結果轉成一個單純的字串陣列回傳，例如: ["王小明", "張懿婷", "李大華"...]
+    athletes = [row['student_name'] for row in rows]
+    return athletes
+
 # 2. 提供資料查詢的 API 端點
 @app.get("/api/results")
 async def search_results(
