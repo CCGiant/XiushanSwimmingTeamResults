@@ -6,9 +6,13 @@ import sqlite3
 
 app = FastAPI(title="游泳比賽成績查詢系統")
 
-# 設定模板資料夾
+# 1. 取得當前檔案 (main.py) 所在的絕對目錄
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# 2. 設定模板與資料庫的絕對路徑
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
+DB_PATH = os.path.join(BASE_DIR, "ctsa_shoushan.sqlite")
+
 templates = Jinja2Templates(directory=TEMPLATE_DIR)
 
 # 資料庫連線輔助函式
