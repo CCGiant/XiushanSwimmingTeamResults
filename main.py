@@ -47,28 +47,41 @@ async def get_activities():
 
     return [dict(row) for row in rows]
 # 2.1 請將這段加在 main.py 裡面，原本的 @app.get("/api/results") 之前或之後都可以
+
+# 修改後的 main.py
 @app.get("/api/athletes")
 async def get_athletes():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 只要撈取「個人成績」的選手姓名，並過濾掉重複的名字，按筆畫或拼音排序
+    # 第一道防線：資料庫 SQL 初步過濾
     query = """
-        SELECT DISTINCT student_name
-        FROM results
-        WHERE event_display = '個人成績'
-          AND student_name IS NOT NULL
+        SELECT DISTINCT student_name 
+        FROM results 
+        WHERE event_display != '總成績' 
+          AND student_name IS NOT NULL 
           AND student_name != ''
-        ORDER BY student_name ASC
     """
-
+    
     cursor.execute(query)
     rows = cursor.fetchall()
     conn.close()
 
-    # 將結果轉成一個單純的字串陣列回傳，例如: ["王小明", "張懿婷", "李大華"...]
-    athletes = [row['student_name'] for row in rows]
-    return athletes
+    # 第二道防線：Python 端終極清洗
+    cleaned_athletes = set()
+    for row in rows:
+        name = row['student_name']
+        if name:
+            name = name.strip()
+            # 【關鍵防護】只要名字裡面有半形或全形空白，就判定為「接力隊伍字串」，直接跳過！
+            # 也可以順便加上長度限制，一般姓名通常不會太長。
+            if ' ' not in name and '　' not in name and len(name) > 0:
+                cleaned_athletes.add(name)
+                
+    # 轉回列表並按照筆畫/拼音進行排序
+    sorted_athletes = sorted(list(cleaned_athletes))
+    
+    return sorted_athletes
 
 # ==========================================
 # 2. 修改：支援「賽事名稱(activity)」過濾的成績查詢 API
