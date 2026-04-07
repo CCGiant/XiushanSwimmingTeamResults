@@ -128,9 +128,21 @@
         let allAthletesDB = []; 
         let selectedAthletes = []; 
 
+        // 只抓取最前面的總成績 (保留給算 PB 用)
         function cleanResultText(text) {
             if (!text) return 'N/A';
             return String(text).trim().split(' ')[0]; 
+        }
+
+        // 新增：提取分段計時文字 (例如：50M:38.25)
+        function getSplitText(text) {
+            if (!text) return '';
+            let parts = String(text).trim().split(' ');
+            if (parts.length > 1) {
+                // 將後面的陣列組合成字串，並稍微美化 (M: 換成 m:)
+                return parts.slice(1).join(' ').replace(/M:/g, 'm: ');
+            }
+            return '';
         }
 
         function timeToSeconds(timeStr) {
@@ -201,7 +213,7 @@
                         activitySelect.appendChild(opt);
                     });
                 }
-            } catch (err) { console.error("無法取得賽事名單", err); }
+            } catch (err) { console.error("無法取得賽事清單", err); }
 
             const filterContainer = document.getElementById('eventFiltersContainer');
             baseStandardEvents.forEach(evt => {
@@ -373,7 +385,23 @@
                         let displayType = item.event_display === '總成績' ? `<span class="px-1.5 py-0.5 text-[9px] bg-green-900 text-green-300 rounded mr-2">總成績</span>` : '';
                         if (item.event_display && item.event_display.includes('棒')) displayType = `<span class="px-1.5 py-0.5 text-[9px] bg-yellow-900 text-yellow-300 rounded mr-2">${item.event_display}</span>`;
 
-                        groupHtml += `<li class="px-4 py-3 flex items-center justify-between hover:bg-gray-700/30 transition"><div class="flex items-center text-sm font-bold text-gray-300 w-[45%] truncate"><span class="w-6 text-center mr-1">${rankIcon}</span> ${displayType}<span class="truncate">${cleanStudentName}</span></div><div class="flex items-center justify-end w-[55%] overflow-hidden"><span class="text-lg font-black text-white tracking-wide flex-shrink-0">${cleanResultText(item.result_text)}</span>${pbBadge}</div></li>`;
+                        // 解析分段計時
+                        const splitText = getSplitText(item.result_text);
+
+                        groupHtml += `<li class="px-4 py-3 flex items-start justify-between hover:bg-gray-700/30 transition">
+                            <div class="flex items-center text-sm font-bold text-gray-300 w-[40%] truncate mt-1">
+                                <span class="w-6 text-center mr-1">${rankIcon}</span> 
+                                ${displayType}
+                                <span class="truncate">${cleanStudentName}</span>
+                            </div>
+                            <div class="flex flex-col items-end w-[60%] overflow-hidden">
+                                <div class="flex items-center justify-end w-full">
+                                    <span class="text-lg font-black text-white tracking-wide flex-shrink-0">${cleanResultText(item.result_text)}</span>
+                                    ${pbBadge}
+                                </div>
+                                ${splitText ? `<div class="text-[10px] text-gray-400 mt-1 flex items-center"><span class="mr-1">⏱️</span> ${splitText}</div>` : ''}
+                            </div>
+                        </li>`;
                     });
                     groupHtml += `</ul></div>`; container.innerHTML += groupHtml;
                 }
@@ -409,20 +437,24 @@
             } else { container.innerHTML += `<p class="text-center text-gray-400 bg-gray-800 p-6 rounded-lg mb-8 border border-gray-700">該條件下無 PB 紀錄</p>`; }
         }
 
-        // ==========================================
-        // 【關鍵修正】多人對戰表：加入首欄固定與橫向捲動
-        // ==========================================
         function renderMultiCompareTable(athletes, dataMap, checkedEvents, container, include25m) {
             const activeEventsList = getActiveEventsList(include25m);
             const eventsToTrack = checkedEvents.length > 0 ? checkedEvents : activeEventsList;
             const matrix = {};
-            eventsToTrack.forEach(evt => { matrix[evt] = {}; athletes.forEach(name => { matrix[evt][name] = { secs: Infinity, display: '-', item: null }; }); });
+            eventsToTrack.forEach(evt => { matrix[evt] = {}; athletes.forEach(name => { matrix[evt][name] = { secs: Infinity, display: '-', item: null, split: '' }; }); });
             athletes.forEach(name => {
                 dataMap[name].forEach(item => {
                     const strokeName = item.standardEventName;
                     if (strokeName && matrix[strokeName]) {
                         let secs = timeToSeconds(item.result_text);
-                        if (secs < matrix[strokeName][name].secs) { matrix[strokeName][name] = { secs: secs, display: cleanResultText(item.result_text), item: item }; }
+                        if (secs < matrix[strokeName][name].secs) { 
+                            matrix[strokeName][name] = { 
+                                secs: secs, 
+                                display: cleanResultText(item.result_text), 
+                                item: item,
+                                split: getSplitText(item.result_text)
+                            }; 
+                        }
                     }
                 });
             });
@@ -436,31 +468,23 @@
                             <thead class="bg-gray-800 text-gray-200 border-b border-gray-600">
                                 <tr>
                                     <th class="px-3 py-3 font-bold sticky left-0 z-20 bg-gray-800 border-r border-gray-600 whitespace-nowrap">項目</th>`;
-                athletes.forEach(name => { 
-                    // 設定每位選手欄位的最小寬度，防止手機版擠壓
-                    tableHtml += `<th class="px-3 py-3 font-bold text-center border-l border-gray-700 min-w-[110px] whitespace-nowrap">${name}</th>`; 
-                });
+                athletes.forEach(name => { tableHtml += `<th class="px-3 py-3 font-bold text-center border-l border-gray-700 min-w-[110px] whitespace-nowrap">${name}</th>`; });
                 tableHtml += `</tr></thead><tbody>`;
-                
                 activeEvents.forEach((evt, index) => {
                     let minSecs = Infinity; athletes.forEach(name => { if (matrix[evt][name].secs < minSecs) minSecs = matrix[evt][name].secs; });
-                    // 使用實體背景色，避免 sticky 捲動時透明度重疊
                     const bgClass = index % 2 === 0 ? 'bg-gray-900' : 'bg-gray-800';
-                    
-                    // 將 "公尺" 縮寫為 "m" 以節省橫向空間
                     let shortEvt = evt.replace('公尺', 'm');
                     let isJuniorTag = evt.includes('25') ? `<span class="ml-1 text-blue-400 font-bold text-lg leading-none">•</span>` : '';
-                    
-                    tableHtml += `<tr class="${bgClass} border-b border-gray-700 hover:bg-gray-700 transition">`;
-                    // 首行固定 (sticky left-0)
-                    tableHtml += `<td class="px-3 py-3 font-medium text-gray-200 whitespace-nowrap sticky left-0 z-10 ${bgClass} border-r border-gray-600 shadow-[2px_0_4px_rgba(0,0,0,0.2)]">${shortEvt} ${isJuniorTag}</td>`;
-                    
+                    tableHtml += `<tr class="${bgClass} border-b border-gray-700 hover:bg-gray-700 transition"><td class="px-3 py-3 font-medium text-gray-200 whitespace-nowrap sticky left-0 z-10 ${bgClass} border-r border-gray-600 shadow-[2px_0_4px_rgba(0,0,0,0.2)]">${shortEvt} ${isJuniorTag}</td>`;
                     athletes.forEach(name => {
                         const data = matrix[evt][name];
                         const isWinner = data.secs === minSecs && minSecs !== Infinity;
                         const cellClass = isWinner ? 'bg-yellow-900/20 text-yellow-400 font-black' : 'text-gray-400 font-medium';
-                        // 使用 line-clamp-2 限制賽事名稱最多兩行，保持高度整齊
                         const sourceText = data.item ? `<div class="text-[10px] text-gray-500 mt-1 font-normal leading-tight line-clamp-2" title="${data.item.activity_short_name || data.item.activity_name}">${data.item.activity_year} ${data.item.activity_short_name || data.item.activity_name || ''}</div>` : '';
+                        
+                        // 多人對戰表不一定需要顯示分段，若要顯示會太擠，此處先保持乾淨，若要顯示可打開下一行
+                        // const splitTextHTML = data.split ? `<div class="text-[9px] text-gray-400 mt-0.5">⏱️ ${data.split}</div>` : '';
+                        
                         tableHtml += `<td class="px-3 py-3 text-center border-l border-gray-700 ${cellClass}"><div class="text-lg tracking-wide">${data.display}</div>${sourceText}</td>`;
                     });
                     tableHtml += `</tr>`;
@@ -476,9 +500,29 @@
                 let badgeClass = 'bg-blue-900 text-blue-300 border border-blue-700'; 
                 if (item.event_display === '總成績') badgeClass = 'bg-green-900 text-green-300 border border-green-700';
                 if (item.event_display && item.event_display.includes('棒')) badgeClass = 'bg-yellow-900 text-yellow-300 border border-yellow-700';
+                
                 const displayResult = cleanResultText(item.result_text);
+                const splitText = getSplitText(item.result_text);
+                
                 let athleteBadge = selectedAthletes.length > 1 ? `<span class="px-2 py-0.5 text-[10px] font-bold bg-purple-900 text-purple-200 rounded border border-purple-700">${item.athleteName}</span>` : '';
-                historyHtml += `<div class="bg-gray-800 border border-gray-700 rounded-lg p-4 flex flex-col md:flex-row md:items-center justify-between shadow-sm hover:border-gray-500 transition"><div class="mb-2 md:mb-0"><div class="flex items-center flex-wrap gap-2 mb-1"><span class="px-2 py-0.5 text-[10px] font-bold rounded ${badgeClass}">${item.event_display || '成績'}</span><span class="text-[10px] text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">${item.activity_year || '?'}</span>${athleteBadge}</div><h3 class="text-sm font-bold text-gray-200 leading-tight mt-2">${item.group_display || item.event_name || '未命名賽事'}</h3><p class="text-xs text-gray-500 mt-1">${item.activity_short_name || item.activity_name || ''}</p></div><div class="text-2xl font-black text-white tracking-tight text-right">${displayResult}</div></div>`;
+                
+                historyHtml += `
+                    <div class="bg-gray-800 border border-gray-700 rounded-lg p-4 flex flex-col md:flex-row md:items-start justify-between shadow-sm hover:border-gray-500 transition">
+                        <div class="mb-2 md:mb-0 w-full md:w-1/2">
+                            <div class="flex items-center flex-wrap gap-2 mb-1">
+                                <span class="px-2 py-0.5 text-[10px] font-bold rounded ${badgeClass}">${item.event_display || '成績'}</span>
+                                <span class="text-[10px] text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">${item.activity_year || '?'}</span>
+                                ${athleteBadge}
+                            </div>
+                            <h3 class="text-sm font-bold text-gray-200 leading-tight mt-2">${item.group_display || item.event_name || '未命名賽事'}</h3>
+                            <p class="text-xs text-gray-500 mt-1">${item.activity_short_name || item.activity_name || ''}</p>
+                        </div>
+                        <div class="flex flex-col items-end w-full md:w-1/2 mt-2 md:mt-0">
+                            <div class="text-2xl font-black text-white tracking-tight">${displayResult}</div>
+                            ${splitText ? `<div class="text-[11px] text-gray-400 font-normal mt-1 bg-gray-900/50 px-2 py-1 rounded border border-gray-700/50">⏱️ ${splitText}</div>` : ''}
+                        </div>
+                    </div>
+                `;
             });
             historyHtml += `</div></div>`; container.innerHTML += historyHtml;
         }
