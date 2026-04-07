@@ -28,6 +28,29 @@ async def read_index(request: Request):
     #return templates.TemplateResponse("index.html", {"request": request})
     return templates.TemplateResponse(request=request, name="index.html")
 
+# ==========================================
+# 3. 新增：取得所有參賽標準的 API
+# ==========================================
+@app.get("/api/standards")
+async def get_standards():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 將 qualifying_standards 表中的所有資料撈出
+    query = """
+        SELECT meet_name, gender, category_group, event_name, standard_time_text, standard_time_sec
+        FROM qualifying_standards
+    """
+    try:
+        cursor.execute(query)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        # 如果資料表還沒建立成功，回傳空陣列避免前端當機
+        conn.close()
+        return []
+
 @app.get("/api/activities")
 async def get_activities():
     conn = get_db_connection()
