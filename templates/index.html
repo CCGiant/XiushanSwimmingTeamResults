@@ -45,7 +45,7 @@
                     <ul id="autocompleteList" class="absolute z-50 w-full bg-white border border-slate-200 rounded-xl mt-1 max-h-48 overflow-y-auto hidden shadow-xl no-scrollbar"></ul>
                 </div>
 
-                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
+                <div class="bg-[#f8fafc] p-6 rounded-2xl border border-slate-200/60 shadow-inner">
                     <div class="flex items-center justify-between">
                         <div>
                             <div class="text-sm font-bold text-slate-900 tracking-wide">賽事達標檢測</div>
@@ -76,7 +76,7 @@
                     </div>
                 </div>
 
-                <div class="flex items-center justify-between bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
+                <div class="flex items-center justify-between bg-[#f8fafc] p-6 rounded-2xl border border-slate-200/60 shadow-inner">
                     <div>
                         <div class="text-sm font-bold text-slate-900 tracking-wide">25m 初階項目</div>
                         <div class="text-xs text-slate-400 mt-1 font-medium">列入 25m 距離的低年級賽事</div>
@@ -89,7 +89,7 @@
 
                 <div>
                     <button type="button" id="toggleFiltersBtn" class="text-xs font-bold text-slate-400 tracking-wider uppercase hover:text-blue-600 transition flex items-center bg-slate-100/80 hover:bg-slate-200 px-3.5 py-2 rounded-xl">
-                        <span id="filterIcon" class="mr-1 text-sm font-bold">+</span> 展開篩選條件 (年份、賽事項目) 
+                        <span id="filterIcon" class="mr-1 text-sm font-bold">+</span> 展開篩選條件 (年份、賽事項目)
                     </button>
                 </div>
 
@@ -124,7 +124,7 @@
                         <option value="" disabled selected>請下拉選擇一場賽事...</option>
                     </select>
                 </div>
-
+                
                 <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 px-4 rounded-xl active:scale-[0.99] transition shadow-md text-sm tracking-wider">
                     載入賽事成績
                 </button>
@@ -242,7 +242,7 @@
             } catch (err) { console.error("無法加載達標門檻", err); }
 
             baseStandardEvents.forEach(evt => {
-                filterContainer.innerHTML += `<label class="cursor-pointer"><input type="checkbox" value="${evt}" class="event-checkbox peer sr-only"><div class="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 text-slate-500 peer-checked:bg-slate-900 peer-checked:text-white peer-checked:border-slate-900 hover:bg-slate-100 transition shadow-sm">${evt}</div></label>`;
+                filterContainer.innerHTML += `<label class="cursor-pointer"><input type="checkbox" value="${evt}" class="event-checkbox peer sr-only"><div class="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 text-slate-500 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600 hover:bg-slate-100 transition shadow-sm">${evt}</div></label>`;
             });
 
             function updateGroupOptions() {
@@ -492,7 +492,7 @@
                     let absHtml = record.absTime < record.indTime ? `<span class="text-xs font-bold text-slate-400 ml-1">(${cleanResultText(record.absItem.result_text)})</span>` : '';
                     const bottomItem = record.indItem || record.absItem;
                     
-                    let isJuniorBadge = stroke.includes('25公尺') ? `<span class="absolute top-4 right-4 bg-purple-50 text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-200 uppercase tracking-wide">25m</span>` : '';
+                    let isJuniorBadge = stroke.includes('25公尺') ? `<span class="absolute top-5 right-5 bg-purple-50 text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-200 uppercase tracking-wide">25m</span>` : '';
                     
                     let stdBadgeHtml = '';
                     if (reqStandardMap && reqStandardMap[stroke] !== undefined) {
@@ -533,38 +533,37 @@
             if (activeEvents.length > 0) {
                 let tableHtml = `<div class="mb-12"><h2 class="text-lg font-bold text-slate-900 mb-1 border-b border-slate-200 pb-4">成績比較表</h2><p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 mt-2">左右滑動查看所有選手 (將滑鼠移至成績上方可查看賽事來源)</p><div class="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm relative bg-white"><table class="w-full text-left text-sm text-slate-800"><thead class="bg-slate-50 border-b border-slate-200"><tr><th class="px-4 py-4 font-bold text-xs text-slate-500 sticky left-0 z-20 bg-slate-50 border-r border-slate-200 whitespace-nowrap">賽事項目</th>`;
                 
-                // 動態調整表頭寬度，人多時縮窄空間
-                let thMinWidth = 'min-w-[100px]';
-                if (athletes.length <= 2) thMinWidth = 'min-w-[130px]';
-                else if (athletes.length === 3) thMinWidth = 'min-w-[110px]';
+                // 動態調整表頭寬度，極限壓縮以容納多人
+                let thMinWidth = 'min-w-[70px] md:min-w-[90px]';
+                if (athletes.length <= 2) thMinWidth = 'min-w-[90px] md:min-w-[110px]';
+                else if (athletes.length === 3) thMinWidth = 'min-w-[80px] md:min-w-[100px]';
 
-                athletes.forEach(name => { tableHtml += `<th class="px-3 py-3 font-bold text-center border-l border-slate-200 ${thMinWidth} whitespace-nowrap text-slate-800">${name}</th>`; }); tableHtml += `</tr></thead><tbody class="divide-y divide-slate-100">`;
+                athletes.forEach(name => { tableHtml += `<th class="px-2 py-3 font-bold text-center border-l border-slate-200 ${thMinWidth} whitespace-nowrap text-slate-800">${name}</th>`; }); tableHtml += `</tr></thead><tbody class="divide-y divide-slate-100">`;
                 
                 activeEvents.forEach((evt, index) => {
                     let minSecs = Infinity; athletes.forEach(name => { if (matrix[evt][name].secs < minSecs) minSecs = matrix[evt][name].secs; });
                     let shortEvt = evt.replace('公尺', 'm'); 
-                    let isJuniorTag = evt.includes('25') ? `<span class="ml-1 bg-purple-50 text-purple-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-purple-200 uppercase">25m</span>` : '';
+                    let isJuniorTag = evt.includes('25') ? `<br><span class="inline-block mt-1 bg-purple-50 text-purple-600 text-[9px] font-bold px-1.5 py-0.5 rounded border border-purple-200 uppercase">25m</span>` : '';
                     
-                    tableHtml += `<tr class="bg-white hover:bg-slate-50 transition"><td class="px-4 py-5 font-bold text-xs text-slate-700 whitespace-nowrap sticky left-0 z-10 bg-white border-r border-slate-200">${shortEvt} ${isJuniorTag}</td>`;
+                    tableHtml += `<tr class="bg-white hover:bg-slate-50 transition"><td class="px-3 py-4 font-bold text-xs text-slate-700 whitespace-nowrap sticky left-0 z-10 bg-white border-r border-slate-200 align-middle">${shortEvt} ${isJuniorTag}</td>`;
                     
                     athletes.forEach(name => {
                         const data = matrix[evt][name]; 
                         const isWinner = data.secs === minSecs && minSecs !== Infinity; 
                         
-                        // 🧠 動態字體大小：人數越多，字體越小，維持手機版一頁多人的清晰度
-                        let dynamicTextSize = 'text-base'; 
-                        if (athletes.length <= 2) dynamicTextSize = 'text-xl';
-                        else if (athletes.length === 3) dynamicTextSize = 'text-lg';
+                        // 🧠 動態字體與留白縮放：最大字體鎖定為 text-base，人多時縮至 text-xs
+                        let dynamicTextSize = 'text-sm md:text-base'; 
+                        if (athletes.length >= 4) dynamicTextSize = 'text-xs md:text-sm';
 
                         const cellStyle = isWinner 
-                            ? `bg-indigo-50/80 text-indigo-600 font-extrabold shadow-[inset_0_0_0_1px_rgba(79,70,229,0.15)] rounded-lg scale-[1.02] transform transition-transform duration-200` 
-                            : 'text-slate-600 font-semibold';
+                            ? `bg-indigo-50 text-indigo-600 font-extrabold shadow-[inset_0_0_0_1px_rgba(79,70,229,0.2)] rounded-lg scale-[1.02] transform transition-transform duration-200` 
+                            : 'text-slate-600 font-medium';
                             
                         const tooltipText = data.item ? `${data.item.activity_year} ${data.item.activity_short_name || data.item.activity_name || ''}` : '';
                         const cursorStyle = data.item ? 'cursor-help hover:bg-slate-50' : '';
                         
-                        tableHtml += `<td class="px-3 py-3 text-center border-l border-slate-100 align-middle ${isWinner ? 'p-1' : ''}" title="${tooltipText}">
-                            <div class="py-2.5 rounded-lg ${cellStyle} ${cursorStyle} transition-colors">
+                        tableHtml += `<td class="px-1.5 py-2.5 text-center border-l border-slate-100 align-middle ${isWinner ? 'p-[2px]' : ''}" title="${tooltipText}">
+                            <div class="py-2 px-1 rounded-lg ${cellStyle} ${cursorStyle} transition-colors">
                                 <div class="${dynamicTextSize} tracking-tight tabular-nums">${data.display}</div>
                             </div>
                         </td>`;
