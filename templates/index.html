@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>秀山泳隊成績查詢</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -73,8 +74,8 @@
 
                 <div class="flex items-center justify-between bg-slate-50 p-5 rounded-xl border border-slate-200">
                     <div>
-                        <div class="text-sm font-black text-slate-800 tracking-wide">25公尺 初階項目</div>
-                        <div class="text-xs text-slate-500 mt-1 font-medium">列入 25公尺 距離的低年級賽事</div>
+                        <div class="text-sm font-black text-slate-800 tracking-wide">25m 初階項目</div>
+                        <div class="text-xs text-slate-500 mt-1 font-medium">列入 25m 距離的低年級賽事</div>
                     </div>
                     <div class="relative inline-block w-12 align-middle select-none">
                         <input type="checkbox" id="toggle25m-athlete" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-slate-300 appearance-none cursor-pointer transition-transform duration-200 ease-in-out"/>
@@ -142,11 +143,28 @@
         </div>
     </div>
 
+    <div id="chartModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm hidden" onclick="closeChartModal()">
+        <div class="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-2xl transition transform scale-95" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h4 id="modalTitle" class="text-lg font-black text-slate-900 tracking-tight">成績成長曲線</h4>
+                    <p id="modalSubtitle" class="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">歷史進步軌跡</p>
+                </div>
+                <button onclick="closeChartModal()" class="text-slate-400 hover:text-slate-900 font-bold transition text-xl px-2">✕</button>
+            </div>
+            <div class="relative h-64 md:h-80 w-full">
+                <canvas id="growthChart"></canvas>
+            </div>
+            <p class="text-[10px] font-medium text-slate-400 text-center mt-4">提示：滑動或點擊數據點可查看詳細賽事與分段配速</p>
+        </div>
+    </div>
+
     <script>
         const baseStandardEvents = ['50公尺自由式', '100公尺自由式', '200公尺自由式', '400公尺自由式', '50公尺仰式', '100公尺仰式', '200公尺仰式', '50公尺蛙式', '100公尺蛙式', '200公尺蛙式', '50公尺蝶式', '100公尺蝶式', '200公尺蝶式', '100公尺混合式', '200公尺混合式', '400公尺混合式'];
         const juniorEvents = ['25公尺自由式', '25公尺仰式', '25公尺蛙式', '25公尺蝶式'];
 
         let allAthletesDB = []; let selectedAthletes = []; let allStandardsDB = []; 
+        let globalAthleteRawData = {}; 
 
         function cleanResultText(text) { return text ? String(text).trim().split(' ')[0] : 'N/A'; }
         function getSplitText(text) {
@@ -154,14 +172,15 @@
             return parts.length > 1 ? parts.slice(1).join(' ').replace(/M:/g, 'm: ') : '';
         }
         function timeToSeconds(timeStr) {
-            let cleanStr = cleanResultText(timeStr); if (cleanStr === 'N/A' || cleanStr.includes('DQ')) return Infinity;
+            let cleanStr = cleanResultText(timeStr); if (cleanStr === 'N/A' || cleanStr.includes('DQ') || cleanStr.includes('未') || cleanStr.includes('棄')) return Infinity;
             let parts = cleanStr.split(':'); return parts.length === 2 ? parseInt(parts[0], 10) * 60 + parseFloat(parts[1]) : parseFloat(cleanStr) || Infinity;
         }
         function formatSeconds(secs) {
-            if (secs === Infinity) return 'N/A'; let m = Math.floor(secs / 60); let s = (secs % 60).toFixed(2);
+            if (secs === Infinity || isNaN(secs)) return 'N/A'; let m = Math.floor(secs / 60); let s = (secs % 60).toFixed(2);
             if (s.length < 5) s = s.padStart(5, '0'); return m > 0 ? `${m.toString().padStart(2, '0')}:${s}` : s;
         }
         function getActiveEventsList(include25m) { return include25m ? juniorEvents.concat(baseStandardEvents) : baseStandardEvents; }
+        
         function getStandardEventName(item, include25m) {
             const fullText = (item.group_display || "") + " " + (item.event_name || "");
             if (item.event_display === '總成績') return null;
@@ -234,7 +253,6 @@
             stdGender.addEventListener('change', updateGroupOptions);
         });
 
-        // 頁籤切換
         const tabBtnAthlete = document.getElementById('tabBtn-athlete'); const tabBtnEvent = document.getElementById('tabBtn-event');
         const tabAthlete = document.getElementById('tab-athlete'); const tabEvent = document.getElementById('tab-event');
         const container = document.getElementById('resultsContainer');
@@ -284,9 +302,7 @@
             });
         }
 
-        // ==========================================
         // 選手成績查詢提交
-        // ==========================================
         document.getElementById('athleteForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             if (selectedAthletes.length === 0) { alert("請先選擇選手"); return; }
@@ -308,10 +324,13 @@
                 const resultsArray = await Promise.all(fetchPromises);
 
                 const athletesPbData = {}; let combinedHistory = []; 
+                globalAthleteRawData = {}; 
 
                 selectedAthletes.forEach((name, index) => {
                     let rawData = resultsArray[index];
                     rawData.forEach(item => { item.standardEventName = getStandardEventName(item, include25m); });
+                    globalAthleteRawData[name] = rawData;
+
                     let pbData = rawData;
                     if (checkedEvents.length > 0) pbData = pbData.filter(item => item.standardEventName && checkedEvents.includes(item.standardEventName));
                     athletesPbData[name] = pbData;
@@ -332,7 +351,7 @@
         });
 
         // ==========================================
-        // 賽事成績總覽提交
+        // 賽事成績總覽提交 (修復 N/A 奪金 Bug)
         // ==========================================
         document.getElementById('eventForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -365,7 +384,17 @@
                 container.innerHTML = `<h2 class="text-xl md:text-2xl font-black text-slate-900 mb-8 pb-4 border-b border-slate-200 tracking-tight">${activityName}</h2>`;
 
                 for (const [groupName, items] of Object.entries(groupedEvents)) {
-                    items.sort((a, b) => timeToSeconds(a.result_text) - timeToSeconds(b.result_text));
+                    
+                    // 🎯 【重要修改】健全新修復排序演算法：確保把所有 Infinity (N/A, DQ) 強制逼退到陣列最尾端，防堵 NaN 崩潰
+                    items.sort((a, b) => {
+                        let secA = timeToSeconds(a.result_text);
+                        let secB = timeToSeconds(b.result_text);
+                        if (secA === Infinity && secB === Infinity) return 0;
+                        if (secA === Infinity) return 1;
+                        if (secB === Infinity) return -1;
+                        return secA - secB;
+                    });
+
                     let groupHtml = `<div class="bg-white border border-slate-200 rounded-2xl shadow-sm mb-8 overflow-hidden"><div class="bg-slate-50/80 px-5 py-4 border-b border-slate-200"><h3 class="text-sm font-black tracking-wide text-slate-800">${groupName}</h3></div><ul class="divide-y divide-slate-100">`;
 
                     items.forEach((item, index) => {
@@ -380,7 +409,7 @@
                                     const lSecs = timeToSeconds(lItem.result_text); if (lSecs < lifetimePbSecs) lifetimePbSecs = lSecs;
                                 }
                             });
-                            if (lifetimePbSecs !== Infinity) {
+                            if (lifetimePbSecs !== Infinity && evtSecs !== Infinity) {
                                 if (evtSecs <= lifetimePbSecs) { 
                                     let drop = (lifetimePbSecs - evtSecs).toFixed(2);
                                     pbBadge = `<div class="text-[10px] font-black tracking-widest text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">NEW PB (-${drop}s)</div>`; 
@@ -392,12 +421,16 @@
                             }
                         }
                         
-                        // 保留前三名金銀銅牌
+                        // 🎯 【重要修改】名次燈號判定：若是未出賽或犯規（Infinity），一律顯示不列入排名「-」
                         let rankHtml = '';
-                        if (index === 0) rankHtml = '<span class="text-2xl mr-2" title="金牌">🥇</span>';
-                        else if (index === 1) rankHtml = '<span class="text-2xl mr-2" title="銀牌">🥈</span>';
-                        else if (index === 2) rankHtml = '<span class="text-2xl mr-2" title="銅牌">🥉</span>';
-                        else rankHtml = `<div class="w-8 text-center text-slate-400 font-black mr-2 text-sm">${index + 1}</div>`;
+                        if (evtSecs === Infinity) {
+                            rankHtml = `<div class="w-8 text-center text-slate-400 font-black mr-2 text-sm">-</div>`;
+                        } else {
+                            if (index === 0) rankHtml = '<span class="text-2xl mr-2" title="金牌">🥇</span>';
+                            else if (index === 1) rankHtml = '<span class="text-2xl mr-2" title="銀牌">🥈</span>';
+                            else if (index === 2) rankHtml = '<span class="text-2xl mr-2" title="銅牌">🥉</span>';
+                            else rankHtml = `<div class="w-8 text-center text-slate-400 font-black mr-2 text-sm">${index + 1}</div>`;
+                        }
 
                         let displayType = item.event_display === '總成績' ? `<span class="px-1.5 py-0.5 text-[9px] font-black bg-emerald-50 text-emerald-700 rounded border border-emerald-200 mr-2">總成績</span>` : '';
                         if (item.event_display && item.event_display.includes('棒')) displayType = `<span class="px-1.5 py-0.5 text-[9px] font-black bg-amber-50 text-amber-700 rounded border border-amber-200 mr-2">${item.event_display}</span>`;
@@ -440,7 +473,13 @@
             });
             const validPbKeys = Object.keys(pbs).filter(k => pbs[k].absTime !== Infinity);
             if (validPbKeys.length > 0) {
-                let pbHtml = `<div class="mb-12"><h2 class="text-lg font-black tracking-wide text-slate-900 mb-6 border-b border-slate-200 pb-3">${name} 生涯最佳成績 (PB)</h2><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">`;
+                let pbHtml = `<div class="mb-12">
+                    <div class="flex flex-col sm:flex-row sm:items-baseline justify-between border-b border-slate-200 pb-3 mb-6">
+                        <h2 class="text-lg font-black tracking-wide text-slate-900">${name} 生涯最佳成績 (PB)</h2>
+                        <span class="text-[11px] font-bold text-blue-500 mt-1 sm:mt-0">👉 點擊成績可查看該項目歷史成長曲線</span>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">`;
+                
                 validPbKeys.forEach(stroke => {
                     const record = pbs[stroke];
                     let indDisplay = record.indItem ? cleanResultText(record.indItem.result_text) : '無紀錄';
@@ -461,15 +500,18 @@
                         }
                     }
 
-                    pbHtml += `<div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-300 transition relative"><h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 pr-12">${stroke}</h3>${isJuniorBadge}<div class="text-3xl font-black text-slate-900 tracking-tighter tabular-nums">${indDisplay} ${absHtml}</div>${stdBadgeHtml}<div class="text-[10px] font-bold text-slate-400 mt-4 truncate tracking-wide">${bottomItem.activity_year || ''} ${bottomItem.activity_short_name || bottomItem.activity_name || ''}</div></div>`;
+                    pbHtml += `<div onclick="openTrendChart('${name}', '${stroke}')" class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-blue-500 cursor-pointer transition relative">
+                        <h3 class="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 pr-12">${stroke}</h3>
+                        ${isJuniorBadge}
+                        <div class="text-3xl font-black text-slate-900 tracking-tighter tabular-nums">${indDisplay} ${absHtml}</div>
+                        ${stdBadgeHtml}
+                        <div class="text-[10px] font-bold text-slate-400 mt-4 truncate tracking-wide">${bottomItem.activity_year || ''} ${bottomItem.activity_short_name || bottomItem.activity_name || ''}</div>
+                    </div>`;
                 });
                 pbHtml += `</div></div>`; container.innerHTML += pbHtml;
             } else { container.innerHTML += `<p class="text-center text-slate-400 text-sm mt-8">無成績數據</p>`; }
         }
 
-        // ==========================================
-        // 🥇 簡約強烈對比：成績比較表的最佳成績高光
-        // ==========================================
         function renderMultiCompareTable(athletes, dataMap, checkedEvents, container, include25m) {
             const activeEventsList = getActiveEventsList(include25m);
             const eventsToTrack = checkedEvents.length > 0 ? checkedEvents : activeEventsList;
@@ -492,7 +534,6 @@
                         const data = matrix[evt][name]; 
                         const isWinner = data.secs === minSecs && minSecs !== Infinity; 
                         
-                        // 最佳成績高光設計：用深靛藍色立體膠囊包覆秒數，不使用圖示
                         const displayDiv = isWinner 
                             ? `<div class="inline-block px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xl font-black tracking-tighter shadow-md transform scale-105">${data.display}</div>`
                             : `<div class="text-xl font-bold text-slate-600 tracking-tighter tabular-nums">${data.display}</div>`;
@@ -502,7 +543,7 @@
                         tableHtml += `<td class="px-4 py-5 text-center border-l border-slate-100 align-middle">${displayDiv}${sourceText}</td>`;
                     }); tableHtml += `</tr>`;
                 }); tableHtml += `</tbody></table></div></div>`; container.innerHTML += tableHtml;
-            } else { container.innerHTML += `<p class="text-center text-slate-400 text-sm mt-8">無成績數據</p>`; }
+            } else { container.innerHTML += `<p class="text-center text-slate-400 bg-gray-800 p-6 rounded-lg mb-8 border border-gray-700">該條件下無法進行成績比較</p>`; }
         }
 
         function renderHistoryList(historyData, container, titleText) {
@@ -511,7 +552,7 @@
             historyData.forEach(item => {
                 let badgeClass = 'bg-blue-50 text-blue-600 border-blue-200'; 
                 if (item.event_display === '總成績') badgeClass = 'bg-emerald-50 text-emerald-600 border-emerald-200';
-                if (item.event_display && item.event_display.includes('棒')) badgeClass = 'bg-amber-50 text-amber-600 border-amber-200';
+                if (item.event_display && item.event_display.includes('棒')) badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
                 
                 const displayResult = cleanResultText(item.result_text); const splitText = getSplitText(item.result_text);
                 let athleteBadge = selectedAthletes.length > 1 ? `<span class="px-2 py-0.5 text-[9px] font-black tracking-wider bg-slate-800 text-white rounded shadow-sm">${item.athleteName}</span>` : '';
@@ -532,6 +573,131 @@
                     </div>
                 </div>`;
             }); historyHtml += `</div></div>`; container.innerHTML += historyHtml;
+        }
+
+        // ==========================================
+        // Chart.js 核心引擎實作
+        // ==========================================
+        let myChartInstance = null;
+
+        function openTrendChart(athleteName, eventName) {
+            const rawData = globalAthleteRawData[athleteName];
+            if (!rawData) return;
+
+            let records = rawData.filter(item => item.standardEventName === eventName);
+            
+            records = records.map(item => {
+                return {
+                    ...item,
+                    seconds: timeToSeconds(item.result_text),
+                    displayTime: cleanResultText(item.result_text),
+                    split: getSplitText(item.result_text)
+                };
+            }).filter(item => item.seconds !== Infinity && !isNaN(item.seconds));
+
+            if (records.length === 0) {
+                alert("該項目尚無足夠的歷史成績繪製圖表");
+                return;
+            }
+
+            // 使用 parseInt 強固升序排列（舊到新）
+            records.sort((a, b) => parseInt(a.activity_year, 10) - parseInt(b.activity_year, 10));
+
+            const labels = records.map(r => `${r.activity_year} ${r.activity_short_name || r.activity_name || ''}`);
+            const dataPoints = records.map(r => r.seconds);
+
+            const minSec = Math.min(...dataPoints);
+            const maxSec = Math.max(...dataPoints);
+            const range = maxSec - minSec;
+            
+            const padding = range > 0 ? range * 0.1 : 0.2;
+            const chartMin = Math.max(0, minSec - padding);
+            const chartMax = maxSec + padding;
+
+            let calculatedStep = 1.0;
+            if (range <= 1.0) { calculatedStep = 0.1; } 
+            else if (range <= 3.0) { calculatedStep = 0.2; } 
+            else if (range <= 6.0) { calculatedStep = 0.5; }
+
+            document.getElementById('modalTitle').textContent = `${athleteName} - ${eventName}`;
+            document.getElementById('modalSubtitle').textContent = `歷年共 ${records.length} 筆成績趨勢`;
+
+            const modal = document.getElementById('chartModal');
+            modal.classList.remove('hidden');
+
+            const ctx = document.getElementById('growthChart').getContext('2d');
+            if (myChartInstance) { myChartInstance.destroy(); } 
+
+            myChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '完賽秒數',
+                        data: dataPoints,
+                        borderColor: '#4f46e5',     
+                        borderWidth: 2,
+                        backgroundColor: 'rgba(79, 70, 229, 0.03)', 
+                        fill: true,
+                        tension: 0.2,               
+                        pointRadius: 5,             
+                        pointHoverRadius: 8,
+                        pointBackgroundColor: '#4f46e5',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }, 
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const index = context.dataIndex;
+                                    const item = records[index];
+                                    let text = `成績: ${item.displayTime}`;
+                                    if (item.split) text += ` (${item.split})`;
+                                    return text;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false }, 
+                            ticks: {
+                                font: { size: 10, weight: 'bold' },
+                                color: '#94a3b8',
+                                callback: function(val) {
+                                    let label = labels[val] || '';
+                                    return label.length > 12 ? label.substring(0, 11) + '..' : label;
+                                }
+                            }
+                        },
+                        y: {
+                            reverse: true,    
+                            min: chartMin,    
+                            max: chartMax,    
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                stepSize: calculatedStep, 
+                                font: { size: 11, family: 'monospace' },
+                                color: '#94a3b8',
+                                callback: function(value) {
+                                    return formatSeconds(value);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function closeChartModal() {
+            document.getElementById('chartModal').classList.add('hidden');
+            if (myChartInstance) { myChartInstance.destroy(); myChartInstance = null; }
         }
     </script>
 </body>
