@@ -51,17 +51,24 @@ async def get_standards():
         conn.close()
         return []
 
+# 修改後的 main.py 檔案片段
+
 @app.get("/api/activities")
 async def get_activities():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # 撈取所有不重複的賽事名稱與年份，並依照年份由新到舊排序
+    # 【智慧排序修正】
+    # 1. 先確保 activity_year 絕對是由新到舊（2026 ➡️ 2025）。
+    # 2. 如果 match_dt 遺失（NULL），自動改拿 created_at 系統建立時間來補位排序！
+    # 這樣一來，最新進來的 2026 賽事不論欄位完不完整，保證全部挺進到最上方。
     query = """
-        SELECT DISTINCT activity_year, activity_name, activity_short_name
+        SELECT activity_year, activity_name, activity_short_name, 
+               COALESCE(MAX(match_dt), MAX(created_at)) as final_dt
         FROM results
         WHERE activity_name IS NOT NULL
-        ORDER BY activity_year DESC, activity_name ASC
+        GROUP BY activity_name
+        ORDER BY activity_year DESC, final_dt DESC
     """
 
     cursor.execute(query)
