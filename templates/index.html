@@ -36,67 +36,63 @@
         </div>
 
         <div id="tab-athlete" class="tab-content active">
-            <form id="athleteForm" class="space-y-6 mb-12">
+            <form id="athleteForm" class="space-y-4 mb-8">
                 <div class="relative">
-                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">選擇選手 (可多選進行成績比較)</label>
-                    <div id="selectedAthletesContainer" class="flex flex-wrap gap-2 mb-3 empty:hidden"></div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">選擇選手 <span class="text-[10px] text-slate-400 normal-case tracking-normal ml-1">(可多選進行比較)</span></label>
+                    </div>
+                    <div id="selectedAthletesContainer" class="flex flex-wrap gap-2 mb-2 empty:hidden"></div>
                     <input type="text" id="athleteInput" placeholder="輸入姓名尋找選手..." autocomplete="off"
-                           class="w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-4 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-medium text-sm">
+                           class="w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition font-medium text-sm">
                     <ul id="autocompleteList" class="absolute z-50 w-full bg-white border border-slate-200 rounded-xl mt-1 max-h-48 overflow-y-auto hidden shadow-xl no-scrollbar"></ul>
                 </div>
 
-                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <div class="text-sm font-bold text-slate-900 tracking-wide">賽事達標檢測</div>
-                            <div class="text-xs text-slate-400 mt-1 font-medium">於成績面板比對特定賽事參賽標準</div>
-                        </div>
-                        <div class="relative inline-block w-12 align-middle select-none">
-                            <input type="checkbox" id="toggleStandard" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-slate-200 appearance-none cursor-pointer transition-transform duration-200 ease-in-out"/>
-                            <label for="toggleStandard" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-200 cursor-pointer transition-colors duration-200"></label>
-                        </div>
+                <div class="flex flex-col sm:flex-row items-center justify-between bg-white border border-slate-200 p-2.5 rounded-xl shadow-sm gap-3">
+                    <div class="flex items-center justify-center sm:justify-start gap-6 px-3 w-full sm:w-auto py-1">
+                        <label class="flex items-center cursor-pointer gap-2 group">
+                            <div class="relative inline-block w-8 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" id="toggleStandard" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-2 border-slate-200 appearance-none cursor-pointer group-hover:border-blue-300"/>
+                                <label for="toggleStandard" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-200 cursor-pointer"></label>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition tracking-wide">達標檢測</span>
+                        </label>
+                        
+                        <label class="flex items-center cursor-pointer gap-2 group">
+                            <div class="relative inline-block w-8 align-middle select-none transition duration-200 ease-in">
+                                <input type="checkbox" id="toggle25m-athlete" class="toggle-checkbox absolute block w-4 h-4 rounded-full bg-white border-2 border-slate-200 appearance-none cursor-pointer group-hover:border-blue-300"/>
+                                <label for="toggle25m-athlete" class="toggle-label block overflow-hidden h-4 rounded-full bg-slate-200 cursor-pointer"></label>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600 group-hover:text-slate-900 transition tracking-wide">含 25公尺</span>
+                        </label>
                     </div>
-                    
-                    <div id="standardSelectors" class="hidden grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-slate-200">
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">目標賽事</label>
-                            <select id="stdMeet" class="w-full rounded-xl text-sm bg-white border border-slate-200 p-3 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm"></select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">選手性別</label>
-                            <select id="stdGender" class="w-full rounded-xl text-sm bg-white border border-slate-200 p-3 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm">
-                                <option value="M">男子組 (M)</option>
-                                <option value="F">女子組 (F)</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">參賽組別</label>
-                            <select id="stdGroup" class="w-full rounded-xl text-sm bg-white border border-slate-200 p-3 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm"></select>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="flex items-center justify-between bg-slate-50 p-6 rounded-2xl border border-slate-200/60 shadow-inner">
-                    <div>
-                        <div class="text-sm font-bold text-slate-900 tracking-wide">25m 初階項目</div>
-                        <div class="text-xs text-slate-400 mt-1 font-medium">列入 25m 距離的低年級賽事</div>
-                    </div>
-                    <div class="relative inline-block w-12 align-middle select-none">
-                        <input type="checkbox" id="toggle25m-athlete" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 border-slate-200 appearance-none cursor-pointer transition-transform duration-200 ease-in-out"/>
-                        <label for="toggle25m-athlete" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-200 cursor-pointer transition-colors duration-200"></label>
-                    </div>
-                </div>
-
-                <div>
-                    <button type="button" id="toggleFiltersBtn" class="text-xs font-bold text-slate-400 tracking-wider uppercase hover:text-blue-600 transition flex items-center bg-slate-100/80 hover:bg-slate-200 px-3.5 py-2 rounded-xl">
-                        <span id="filterIcon" class="mr-1 text-sm font-bold">+</span> 展開進階過濾
+                    <button type="button" id="toggleFiltersBtn" class="text-xs font-bold text-slate-500 tracking-wide hover:text-blue-600 transition flex items-center bg-slate-50 hover:bg-slate-100 px-3 py-2 rounded-lg w-full sm:w-auto justify-center border border-slate-100">
+                        <span id="filterIcon" class="mr-1 text-sm font-bold leading-none">+</span> 展開篩選條件(年度、項目)
                     </button>
                 </div>
 
-                <div id="advancedFilters" class="bg-white p-6 rounded-2xl border border-slate-200 space-y-6 hidden">
+                <div id="standardSelectors" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50/50 p-4 rounded-xl border border-slate-200 shadow-inner mt-2">
                     <div>
-                        <label for="year" class="block text-xs font-bold text-slate-400 mb-2">限定賽事年份</label>
-                        <select id="year" class="w-full md:w-1/3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-3 py-3 text-sm font-medium focus:outline-none focus:border-blue-500">
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1">目標賽事</label>
+                        <select id="stdMeet" class="w-full rounded-lg text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm"></select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1">選手性別</label>
+                        <select id="stdGender" class="w-full rounded-lg text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm">
+                            <option value="M">男子組 (M)</option>
+                            <option value="F">女子組 (F)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-1">參賽組別</label>
+                        <select id="stdGroup" class="w-full rounded-lg text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm"></select>
+                    </div>
+                </div>
+
+                <div id="advancedFilters" class="bg-slate-50/50 p-4 rounded-xl border border-slate-200 shadow-inner space-y-4 hidden mt-2">
+                    <div>
+                        <label for="year" class="block text-[10px] font-bold text-slate-500 mb-1.5">限定賽事年份</label>
+                        <select id="year" class="w-full sm:w-1/3 rounded-lg border border-slate-200 bg-white text-slate-900 px-3 py-2.5 text-xs font-medium focus:outline-none focus:border-blue-500 shadow-sm">
                             <option value="">全部年份</option>
                             <option value="2026">2026</option>
                             <option value="2025">2025</option>
@@ -105,49 +101,49 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 mb-3">限定特定項目</label>
-                        <div id="eventFiltersContainer" class="flex flex-wrap gap-2"></div>
+                        <label class="block text-[10px] font-bold text-slate-500 mb-2">限定特定項目</label>
+                        <div id="eventFiltersContainer" class="flex flex-wrap gap-1.5"></div>
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 px-4 rounded-xl active:scale-[0.99] transition shadow-sm text-sm tracking-wider">
+                <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 px-4 rounded-xl active:scale-[0.99] transition shadow-md text-sm tracking-wider mt-2">
                     查詢選手成績
                 </button>
             </form>
         </div>
 
         <div id="tab-event" class="tab-content">
-            <form id="eventForm" class="space-y-6 mb-12">
-                <div>
+            <form id="eventForm" class="space-y-4 mb-8">
+                <div class="relative">
                     <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">選擇目標賽事</label>
-                    <select id="activitySelect" required class="w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-4 focus:outline-none focus:border-blue-500 transition font-medium text-sm">
+                    <select id="activitySelect" required class="w-full rounded-xl border border-slate-200 bg-slate-50 text-slate-900 px-4 py-3 focus:outline-none focus:border-blue-500 transition font-medium text-sm">
                         <option value="" disabled selected>請下拉選擇一場賽事...</option>
                     </select>
                 </div>
                 
                 <div>
-                    <button type="button" id="toggleEventFiltersBtn" class="text-xs font-bold text-slate-400 tracking-wider uppercase hover:text-indigo-600 transition flex items-center bg-slate-100/80 hover:bg-slate-200 px-3.5 py-2 rounded-xl">
-                        <span id="eventFilterIcon" class="mr-1 text-sm font-bold">+</span> 展開篩選條件 (項目、歲級、性別)
+                    <button type="button" id="toggleEventFiltersBtn" class="text-[11px] font-bold text-slate-500 tracking-wider hover:text-blue-600 transition flex items-center bg-slate-50 hover:bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-100 shadow-sm">
+                        <span id="eventFilterIcon" class="mr-1 text-sm font-bold leading-none">+</span> 展開篩選條件 (項目、歲級、性別)
                     </button>
                 </div>
 
-                <div id="eventAdvancedFilters" class="bg-white p-6 rounded-2xl border border-slate-200 hidden">
+                <div id="eventAdvancedFilters" class="bg-slate-50/50 p-5 rounded-2xl border border-slate-200 shadow-inner hidden mt-2">
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                         <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">特定項目</label>
-                            <select id="filterEventName" class="w-full rounded-xl text-sm bg-slate-50 border border-slate-200 p-3 focus:outline-none focus:border-indigo-500 text-slate-700 font-medium">
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5">特定項目</label>
+                            <select id="filterEventName" class="w-full rounded-xl text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm">
                                 <option value="">全部項目 (請先選擇上方賽事)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">特定歲級 / 年級</label>
-                            <select id="filterAgeGroup" class="w-full rounded-xl text-sm bg-slate-50 border border-slate-200 p-3 focus:outline-none focus:border-indigo-500 text-slate-700 font-medium">
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5">特定歲級 / 年級</label>
+                            <select id="filterAgeGroup" class="w-full rounded-xl text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm">
                                 <option value="">全部歲級 (請先選擇上方賽事)</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-400 mb-1.5">特定性別</label>
-                            <select id="filterGender" class="w-full rounded-xl text-sm bg-slate-50 border border-slate-200 p-3 focus:outline-none focus:border-indigo-500 text-slate-700 font-medium">
+                            <label class="block text-[10px] font-bold text-slate-500 mb-1.5">特定性別</label>
+                            <select id="filterGender" class="w-full rounded-xl text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm">
                                 <option value="">全部性別</option>
                                 <option value="男子">男子組</option>
                                 <option value="女子">女子組</option>
@@ -156,7 +152,7 @@
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-4 px-4 rounded-xl active:scale-[0.99] transition shadow-md text-sm tracking-wider mt-4">
+                <button type="submit" class="w-full bg-slate-900 hover:bg-black text-white font-bold py-3.5 px-4 rounded-xl active:scale-[0.99] transition shadow-md text-sm tracking-wider mt-4">
                     載入賽事成績
                 </button>
             </form>
@@ -258,7 +254,7 @@
             const filterEventName = document.getElementById('filterEventName');
             const filterAgeGroup = document.getElementById('filterAgeGroup');
             const filterGender = document.getElementById('filterGender');
-            let currentEventDataCache = null; // 用來存放背後預載的賽事成績，避免重複 fetch
+            let currentEventDataCache = null; // 存放背後預載的賽事成績，避免重複 fetch
 
             try {
                 const res = await fetch('/api/athletes');
@@ -322,16 +318,16 @@
 
             toggleFiltersBtn.addEventListener('click', function() {
                 advancedFilters.classList.toggle('hidden'); 
-                filterIcon.textContent = advancedFilters.classList.contains('hidden') ? '−' : '+';
+                filterIcon.textContent = advancedFilters.classList.contains('hidden') ? '+' : '−';
             });
 
-            // 🧠 展開賽事總覽的動態篩選按鈕
+            // 🧠 展開賽事總覽的動態篩選面板按鈕
             toggleEventFiltersBtn.addEventListener('click', function() {
                 eventAdvancedFilters.classList.toggle('hidden'); 
                 eventFilterIcon.textContent = eventAdvancedFilters.classList.contains('hidden') ? '+' : '−';
             });
 
-            // 🧠 背景動態抓取賽事 Metadata
+            // 🧠 背景動態抓取賽事 Metadata，用來充填下拉選單
             activitySelect.addEventListener('change', async function() {
                 const activityName = this.value;
                 if (!activityName) return;
@@ -347,7 +343,7 @@
                     let events = new Set();
                     
                     currentEventDataCache.forEach(item => {
-                        // 利用取代法，自動剃除性別字眼，乾淨取出各賽事獨特的「歲級/年級」名稱
+                        // 乾淨取出各賽事獨特的「歲級/年級」名稱
                         let g = item.group_display || "";
                         let age = g.replace(/男子組?|女子組?|男子|女子/g, '').trim();
                         if (age) ages.add(age);
@@ -356,14 +352,14 @@
                         if (stdName) events.add(stdName);
                     });
                     
-                    // 將分析出來的項目灌入下拉選單
+                    // 填入項目選項
                     let eventHtml = '<option value="">全部項目</option>';
                     const allPossibleEvents = getActiveEventsList(true);
                     const sortedEvents = Array.from(events).sort((a, b) => allPossibleEvents.indexOf(a) - allPossibleEvents.indexOf(b));
                     sortedEvents.forEach(evt => { eventHtml += `<option value="${evt}">${evt}</option>`; });
                     filterEventName.innerHTML = eventHtml;
                     
-                    // 將分析出來的歲級灌入下拉選單
+                    // 填入歲級選項
                     let ageHtml = '<option value="">全部歲級 / 年級</option>';
                     Array.from(ages).sort().forEach(age => { ageHtml += `<option value="${age}">${age}</option>`; });
                     filterAgeGroup.innerHTML = ageHtml;
