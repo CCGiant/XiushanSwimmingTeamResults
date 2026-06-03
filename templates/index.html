@@ -204,9 +204,11 @@
         }
         function getActiveEventsList(include25m) { return include25m ? juniorEvents.concat(baseStandardEvents) : baseStandardEvents; }
         
-        function getStandardEventName(item, include25m) {
-            const fullText = (item.group_display || "") + " " + (item.event_name || "");
+		  function getStandardEventName(item, include25m) {
+            // 加上 .replace(/\s+/g, '') 消除所有空白，確保「100公尺 蛙式」能完美比對「100公尺蛙式」
+            const fullText = ((item.group_display || "") + " " + (item.event_name || "")).replace(/\s+/g, '');
             if (item.event_display === '總成績') return null;
+            // ... 下略
             let isSplit = item.event_display && item.event_display.includes('棒'); let isInd = !fullText.includes('接力') && !isSplit;
             const activeEvents = getActiveEventsList(include25m);
 
