@@ -727,6 +727,10 @@
             if (!rawData) return;
 
             let records = rawData.filter(item => item.standardEventName === eventName);
+            // 個人成績與接力分段不能放在同一條完賽趨勢線比較。
+            const individualRecords = records.filter(item => !(item.event_display || '').includes('棒') && Number.isFinite(timeToSeconds(item.result_text)));
+            const splitOnly = individualRecords.length === 0;
+            if (!splitOnly) records = individualRecords;
             records = records.map(item => {
                 let month = 1;
                 if (item.match_dt) { month = parseInt(item.match_dt.split('-')[1], 10); } 
@@ -789,7 +793,7 @@
                 data: {
                     labels: labels,
                     datasets: [{
-                        label: '完賽秒數',
+                        label: splitOnly ? '接力分段秒數' : '完賽秒數',
                         data: dataPoints,
                         borderColor: '#4f46e5',     
                         borderWidth: 2.5,
