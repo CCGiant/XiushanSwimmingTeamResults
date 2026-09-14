@@ -189,7 +189,13 @@
         let globalAthleteRawData = {}; 
         let myChartInstance = null;
 
-        function cleanResultText(text) { return text ? String(text).trim().split(' ')[0] : 'N/A'; }
+        function cleanResultText(text) {
+            const result = text ? String(text).trim().split(' ')[0] : 'N/A';
+            if (/^\d+(?:\.\d+)?$/.test(result) && Number(result) >= 60) {
+                return formatSeconds(Number(result));
+            }
+            return result;
+        }
         function getSplitText(text) {
             if (!text) return ''; let parts = String(text).trim().split(' ');
             return parts.length > 1 ? parts.slice(1).join(' ').replace(/M:/g, 'm: ') : '';
