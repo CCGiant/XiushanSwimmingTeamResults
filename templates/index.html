@@ -123,7 +123,7 @@
                 
                 <div>
                     <button type="button" id="toggleEventFiltersBtn" class="text-[11px] font-bold text-slate-500 tracking-wider hover:text-blue-600 transition flex items-center bg-slate-50 hover:bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-100 shadow-sm">
-                        <span id="eventFilterIcon" class="mr-1 text-sm font-bold leading-none">+</span> 展開篩選條件 (項目、歲級、性別)
+                        <span id="eventFilterIcon" class="mr-1 text-sm font-bold leading-none">+</span> 展開篩選條件 (項目、歲級、性別、名次)
                     </button>
                 </div>
 
@@ -149,6 +149,14 @@
                                 <option value="女子">女子組</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="mt-4 border-t border-slate-200 pt-4">
+                        <label for="honorRankLimit" class="block text-[10px] font-bold text-slate-500 mb-1.5">榮譽榜顯示範圍</label>
+                        <select id="honorRankLimit" aria-describedby="honorRankHelp" class="w-full sm:w-48 rounded-xl text-xs bg-white border border-slate-200 p-2.5 focus:outline-none focus:border-blue-500 text-slate-700 font-medium shadow-sm">
+                            <option value="8">前八名</option>
+                            <option value="6">前六名</option>
+                        </select>
+                        <p id="honorRankHelp" class="text-xs text-slate-500 mt-2 leading-relaxed">獲獎資格以官方規程為準，接力以團隊總成績計算。</p>
                     </div>
                 </div>
 
@@ -345,7 +353,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            let honorPreviewLimit = 8;
+            const honorRankLimit = document.getElementById('honorRankLimit');
             
             const athleteInput = document.getElementById('athleteInput'); 
             const autocompleteList = document.getElementById('autocompleteList'); 
@@ -581,6 +589,7 @@
                 const include25m = true; 
 
                 // 抓取畫面上選擇的過濾條件
+                const honorPreviewLimit = Number(honorRankLimit.value) === 6 ? 6 : 8;
                 const selEvent = filterEventName.value;
                 const selGender = filterGender.value;
                 const selAge = filterAgeGroup.value;
@@ -636,11 +645,15 @@
                     let filterTitleSuffix = (selEvent || selGender || selAge) ? '<span class="text-sm text-blue-500 font-bold ml-3 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 align-middle">已套用進階篩選</span>' : '';
                     container.innerHTML = `<h2 class="text-xl md:text-2xl font-black text-slate-900 mb-8 pb-4 border-b border-slate-200 tracking-tight">${escapeHonorText(activityName)} ${filterTitleSuffix}</h2>`;
                     container.innerHTML += `<section aria-labelledby="honorTitle" class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 md:p-6 mb-8">
-                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <h2 id="honorTitle" class="text-xl font-black text-indigo-950">榮譽榜</h2>
-                            <label class="text-sm text-indigo-800">顯示名次 <select id="honorPreviewLimit" class="ml-1 rounded-lg border border-indigo-200 bg-white p-2"><option value="8" ${honorPreviewLimit === 8 ? 'selected' : ''}>前八名</option><option value="6" ${honorPreviewLimit === 6 ? 'selected' : ''}>前六名</option></select></label>
+                        <div class="text-center mb-5">
+                            <div aria-hidden="true" class="text-3xl mb-2">🏆</div>
+                            <div class="flex items-center justify-center gap-4">
+                                <span aria-hidden="true" class="h-px w-12 bg-amber-300"></span>
+                                <h2 id="honorTitle" class="text-2xl md:text-3xl font-black tracking-widest text-indigo-950">榮譽榜</h2>
+                                <span aria-hidden="true" class="h-px w-12 bg-amber-300"></span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-3">致敬每一次全力以赴${selEvent || selGender || selAge ? ' · 已套用篩選' : ''}</p>
                         </div>
-                        <p class="text-sm text-slate-600 mb-4">依賽事名次顯示個人與接力成績，獲獎資格以官方規程為準。接力以團隊總成績計算。${selEvent || selGender || selAge ? '目前已套用進階篩選。' : ''}</p>
                         <div id="honorCards" aria-live="polite">${buildHonorCards(filteredData, honorPreviewLimit)}</div>
                     </section>`;
 
@@ -699,11 +712,6 @@
                         });
                         groupHtml += `</ul></div>`; container.innerHTML += groupHtml;
                     }
-                    // 全部列表完成後才綁定，避免 innerHTML 重建節點遺失事件。
-                    document.getElementById('honorPreviewLimit').addEventListener('change', event => {
-                        honorPreviewLimit = Number(event.target.value) === 6 ? 6 : 8;
-                        document.getElementById('honorCards').innerHTML = buildHonorCards(filteredData, honorPreviewLimit);
-                    });
                 } catch (error) { container.innerHTML = `<p class="text-center text-rose-500 text-sm font-bold mt-10">錯誤：${error.message}</p>`; }
             });
         });
