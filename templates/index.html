@@ -231,7 +231,121 @@
             return null;
         }
 
+        // 依賽事名次篩選；官方獲獎資格仍依各賽事規程認定。
+        function escapeHonorText(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[ch]);
+        }
+        function getRaceRank(value) {
+            const text = String(value ?? '').trim();
+            if (!/^\d+(?:\.0+)?$/.test(text)) return null;
+            const rank = Number(text);
+            return Number.isSafeInteger(rank) && rank > 0 ? rank : null;
+        }
+        function raceRankLabel(value) {
+            const rank = getRaceRank(value);
+            return rank === null ? '名次未提供' : `第 ${rank} 名`;
+        }
+        function isHonorRelay(item) {
+            return /接力|棒|總成績/.test(`${item.event_name || ''} ${item.event_display || ''}`);
+        }
+        // 僅供賽事總覽篩選，保留個人 PB 使用的項目正規化規則。
+        function getOverviewEventName(item) {
+            if (!isHonorRelay(item)) return getStandardEventName(item, true);
+            const text = String(item.event_name || '').replace(/\s+/g, '').replace(/[xX*×]/g, '×');
+            const match = text.match(/\d+×\d+公尺.*?接力/);
+            return match ? match[0] : '其他接力';
+        }
+        function collectHonorRelays(data, limit) {
+            const teams = new Map();
+            data.forEach(item => {
+                const rank = getRaceRank(item.rank);
+                // 棒次分段的時間、名次不能當作接力隊伍總成績。
+                if (!isHonorRelay(item) || /棒/.test(item.event_display || '') || rank === null || rank > limit
+                    || !Number.isFinite(timeToSeconds(item.result_text))) return;
+                const members = String(item.student_name || '').trim().split(/[\s、,，]+/).filter(Boolean);
+                if (!members.length) return;
+                const key = JSON.stringify([item.activity_id, item.activity_name, item.group_display,
+                    item.event_name, item.source_url, cleanResultText(item.result_text), rank]);
+                if (!teams.has(key)) teams.set(key, {item, rank, rosters: new Map(), singles: new Set()});
+                const team = teams.get(key);
+                if (members.length > 1) {
+                    // 同成績、同名次的不同隊伍仍以完整名單區分。
+                    const rosterKey = JSON.stringify([...new Set(members)].sort());
+                    if (!team.rosters.has(rosterKey)) team.rosters.set(rosterKey, [...new Set(members)]);
+                } else team.singles.add(members[0]);
+            });
+            const records = [];
+            teams.forEach(team => {
+                const known = new Set([...team.rosters.values()].flat());
+                const remaining = [...team.singles].filter(name => !known.has(name));
+                team.rosters.forEach(members => records.push({item: team.item, rank: team.rank, members}));
+                if (remaining.length) records.push({item: team.item, rank: team.rank, members: remaining});
+            });
+            return records.sort((a, b) => a.rank - b.rank || String(a.item.event_name).localeCompare(String(b.item.event_name), 'zh-Hant'));
+        }
+        function buildRelayHonorCards(records) {
+            return records.map(({item, rank, members}) => {
+                const medal = ['', '🥇', '🥈', '🥉'][rank] || '';
+                const event = getOverviewEventName(item);
+                return `<article data-honor-relay class="min-w-0 rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                        <span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">接力團隊</span>
+                        <span class="text-sm font-bold text-emerald-700">${medal} 第 ${rank} 名</span>
+                    </div>
+                    <h3 class="font-bold text-lg text-slate-900 break-words">${escapeHonorText(event)}</h3>
+                    <p class="text-xs text-slate-500 mt-1 break-words">${escapeHonorText(item.group_display || item.event_name || '未分組')}</p>
+                    <div class="my-4"><span class="text-xs text-slate-500 mr-2">團體總成績</span><span class="text-2xl font-black tabular-nums text-slate-900">${escapeHonorText(cleanResultText(item.result_text))}</span></div>
+                    <div class="border-t border-emerald-100 pt-3"><p class="text-xs text-slate-500 mb-2">參賽隊員</p>
+                        <ul class="flex flex-wrap gap-2">${members.map(name => `<li class="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-800 break-all">${escapeHonorText(name)}</li>`).join('')}</ul>
+                    </div>
+                </article>`;
+            }).join('');
+        }
+        function buildHonorCards(data, limit) {
+            const athletes = new Map();
+            const seen = new Set();
+            data.forEach(item => {
+                const rank = getRaceRank(item.rank);
+                const name = String(item.student_name || '').trim();
+                const eventText = `${item.event_name || ''} ${item.event_display || ''}`;
+                if (!name || rank === null || rank > limit || /接力|棒|總成績/.test(eventText)
+                    || !Number.isFinite(timeToSeconds(item.result_text))) return;
+                const key = JSON.stringify([name, item.activity_id, item.group_display, item.event_name,
+                    cleanResultText(item.result_text), rank]);
+                if (seen.has(key)) return;
+                seen.add(key);
+                if (!athletes.has(name)) athletes.set(name, []);
+                athletes.get(name).push({item, rank});
+            });
+            const relays = collectHonorRelays(data, limit);
+            if (!athletes.size && !relays.length) return '<p class="text-sm text-slate-500 py-4">目前篩選條件下，尚無符合的個人或接力名次紀錄。</p>';
+            const cards = [...athletes.entries()].sort(([a], [b]) => a.localeCompare(b, 'zh-Hant')).map(([name, records]) => {
+                records.sort((a, b) => a.rank - b.rank || String(a.item.event_name).localeCompare(String(b.item.event_name), 'zh-Hant'));
+                const rows = records.map(({item, rank}) => {
+                    const medal = ['', '🥇', '🥈', '🥉'][rank] || '';
+                    const event = String(item.event_name || '未知項目').replace(item.group_display || '', '').replace(/^\s*游泳\s*/, '').trim();
+                    return `<li class="py-3 border-t border-slate-100">
+                        <div class="flex items-start justify-between gap-3"><span class="text-sm font-bold text-slate-800 break-words min-w-0">${escapeHonorText(event)}</span><span class="shrink-0 text-sm font-bold text-indigo-700">${medal} 第 ${rank} 名</span></div>
+                        <div class="mt-1 text-xs text-slate-500 break-words">${escapeHonorText(item.group_display || '未分組')}</div>
+                        <div class="mt-1 text-sm font-bold tabular-nums text-slate-700">${escapeHonorText(cleanResultText(item.result_text))}</div>
+                    </li>`;
+                });
+                return `<article class="min-w-0 rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
+                    <h3 class="font-bold text-lg text-slate-900 break-words">${escapeHonorText(name)}</h3>
+                    <p class="text-xs text-slate-500 mt-1 mb-3">${records.length} 項個人成績進入前 ${limit} 名</p>
+                    <ul>${rows.slice(0, 3).join('')}</ul>
+                    ${rows.length > 3 ? `<details><summary class="cursor-pointer text-sm text-indigo-700 py-2">展開其餘 ${rows.length - 3} 項</summary><ul>${rows.slice(3).join('')}</ul></details>` : ''}
+                </article>`;
+            }).join('');
+            return `<p class="text-sm text-indigo-800 mb-4">個人：${athletes.size} 位選手・${seen.size} 項成績｜接力：${relays.length} 項團隊成績</p>
+                ${cards ? `<h3 class="font-bold text-indigo-900 mb-3">個人表現</h3><div class="grid grid-cols-1 md:grid-cols-2 items-start gap-4">${cards}</div>` : ''}
+                ${relays.length ? `<h3 class="font-bold text-emerald-800 mt-6 mb-3">團隊之光</h3><div class="grid grid-cols-1 md:grid-cols-2 items-start gap-4">${buildRelayHonorCards(relays)}</div>` : ''}`;
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
+            let honorPreviewLimit = 8;
             
             const athleteInput = document.getElementById('athleteInput'); 
             const autocompleteList = document.getElementById('autocompleteList'); 
@@ -356,15 +470,15 @@
                         let age = g.replace(/男子組?|女子組?|男子|女子/g, '').trim();
                         if (age) ages.add(age);
                         
-                        let stdName = getStandardEventName(item, true); // true 代表包含 25M
+                        let stdName = getOverviewEventName(item); // 包含個人與接力項目
                         if (stdName) events.add(stdName);
                     });
                     
                     // 填入項目選項
                     let eventHtml = '<option value="">全部項目</option>';
                     const allPossibleEvents = getActiveEventsList(true);
-                    const sortedEvents = Array.from(events).sort((a, b) => allPossibleEvents.indexOf(a) - allPossibleEvents.indexOf(b));
-                    sortedEvents.forEach(evt => { eventHtml += `<option value="${evt}">${evt}</option>`; });
+                    const sortedEvents = Array.from(events).sort((a, b) => (allPossibleEvents.includes(a) ? allPossibleEvents.indexOf(a) : 999) - (allPossibleEvents.includes(b) ? allPossibleEvents.indexOf(b) : 999) || a.localeCompare(b, 'zh-Hant'));
+                    sortedEvents.forEach(evt => { eventHtml += `<option value="${escapeHonorText(evt)}">${escapeHonorText(evt)}</option>`; });
                     filterEventName.innerHTML = eventHtml;
                     
                     // 填入歲級選項
@@ -484,7 +598,7 @@
 
                     // 🔥 執行精準多條件過濾
                     let filteredData = eventData.filter(item => {
-                        let stdName = getStandardEventName(item, true); 
+                        let stdName = getOverviewEventName(item);
                         let passEvent = selEvent ? (stdName === selEvent) : true;
                         
                         let g = item.group_display || "";
@@ -520,7 +634,15 @@
 
                     // 若有使用篩選條件，標題加上附註
                     let filterTitleSuffix = (selEvent || selGender || selAge) ? '<span class="text-sm text-blue-500 font-bold ml-3 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 align-middle">已套用進階篩選</span>' : '';
-                    container.innerHTML = `<h2 class="text-xl md:text-2xl font-black text-slate-900 mb-8 pb-4 border-b border-slate-200 tracking-tight">${activityName} ${filterTitleSuffix}</h2>`;
+                    container.innerHTML = `<h2 class="text-xl md:text-2xl font-black text-slate-900 mb-8 pb-4 border-b border-slate-200 tracking-tight">${escapeHonorText(activityName)} ${filterTitleSuffix}</h2>`;
+                    container.innerHTML += `<section aria-labelledby="honorTitle" class="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4 md:p-6 mb-8">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                            <h2 id="honorTitle" class="text-xl font-black text-indigo-950">榮譽榜</h2>
+                            <label class="text-sm text-indigo-800">顯示名次 <select id="honorPreviewLimit" class="ml-1 rounded-lg border border-indigo-200 bg-white p-2"><option value="8" ${honorPreviewLimit === 8 ? 'selected' : ''}>前八名</option><option value="6" ${honorPreviewLimit === 6 ? 'selected' : ''}>前六名</option></select></label>
+                        </div>
+                        <p class="text-sm text-slate-600 mb-4">依賽事名次顯示個人與接力成績，獲獎資格以官方規程為準。接力以團隊總成績計算。${selEvent || selGender || selAge ? '目前已套用進階篩選。' : ''}</p>
+                        <div id="honorCards" aria-live="polite">${buildHonorCards(filteredData, honorPreviewLimit)}</div>
+                    </section>`;
 
                     for (const [groupName, items] of Object.entries(groupedEvents)) {
                         items.sort((a, b) => {
@@ -532,7 +654,7 @@
 
                         let groupHtml = `<div class="bg-white border border-slate-200 rounded-2xl shadow-sm mb-8 overflow-hidden"><div class="bg-slate-50/80 px-5 py-4 border-b border-slate-200"><h3 class="text-sm font-bold tracking-wide text-slate-800">${groupName}</h3></div><ul class="divide-y divide-slate-100">`;
 
-                        items.forEach((item, index) => {
+                        items.forEach(item => {
                             const evtSecs = timeToSeconds(item.result_text);
                             const stdName = item.standardEventName;
                             let pbBadge = ''; const cleanStudentName = item.student_name.trim();
@@ -556,15 +678,7 @@
                                 }
                             }
                             
-                            let rankHtml = '';
-                            if (evtSecs === Infinity) {
-                                rankHtml = `<div class="w-8 text-center text-slate-400 font-bold mr-2 text-sm">-</div>`;
-                            } else {
-                                if (index === 0) rankHtml = '<span class="text-2xl mr-2 filter drop-shadow-sm" title="金牌">🥇</span>';
-                                else if (index === 1) rankHtml = '<span class="text-2xl mr-2 filter drop-shadow-sm" title="銀牌">🥈</span>';
-                                else if (index === 2) rankHtml = '<span class="text-2xl mr-2 filter drop-shadow-sm" title="銅牌">🥉</span>';
-                                else rankHtml = `<div class="w-8 text-center text-slate-400 font-black mr-2 text-sm">${index + 1}</div>`;
-                            }
+                            const rankHtml = `<span class="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-600 mr-2">${raceRankLabel(item.rank)}</span>`;
 
                             let displayType = item.event_display === '總成績' ? `<span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-50 text-emerald-700 rounded border border-emerald-200 mr-2">總成績</span>` : '';
                             if (item.event_display && item.event_display.includes('棒')) displayType = `<span class="px-1.5 py-0.5 text-[9px] font-bold bg-amber-50 text-amber-700 rounded border border-amber-200 mr-2">${item.event_display}</span>`;
@@ -585,6 +699,11 @@
                         });
                         groupHtml += `</ul></div>`; container.innerHTML += groupHtml;
                     }
+                    // 全部列表完成後才綁定，避免 innerHTML 重建節點遺失事件。
+                    document.getElementById('honorPreviewLimit').addEventListener('change', event => {
+                        honorPreviewLimit = Number(event.target.value) === 6 ? 6 : 8;
+                        document.getElementById('honorCards').innerHTML = buildHonorCards(filteredData, honorPreviewLimit);
+                    });
                 } catch (error) { container.innerHTML = `<p class="text-center text-rose-500 text-sm font-bold mt-10">錯誤：${error.message}</p>`; }
             });
         });
